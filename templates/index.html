@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schoolwork Log Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --accent: #4f7dff;
+      --accent2: #7c5fff;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --radius: 12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* Upload Zone */
+    .upload-card {
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .upload-card.drag-over {
+      border-color: var(--accent);
+      background: rgba(79, 125, 255, 0.05);
+    }
+
+    .upload-card input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .upload-card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .upload-card p {
+      color: var(--muted);
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: rgba(79, 125, 255, 0.1);
+      border: 1px solid rgba(79, 125, 255, 0.3);
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      font-size: 0.875rem;
+      color: var(--accent);
+      margin-top: 1rem;
+    }
+
+    .file-info.visible { display: flex; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+
+    #analyze-btn {
+      margin-top: 1.5rem;
+    }
+
+    /* Progress */
+    .progress-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 1.5rem 0;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar.visible { display: block; }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    /* Results */
+    .results {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-top: 2rem;
+    }
+
+    .pass-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .pass-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .pass-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pass-icon { font-size: 1.25rem; }
+
+    .pass-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .pass-status {
+      margin-left: auto;
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .pass-body {
+      padding: 1.25rem;
+    }
+
+    .pass-content {
+      font-size: 0.875rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      color: var(--text);
+      font-family: inherit;
+    }
+
+    /* Markdown-like styling within content */
+    .pass-content strong,
+    .pass-content b { color: #fff; font-weight: 600; }
+
+    .rendered-content h1, .rendered-content h2, .rendered-content h3 {
+      color: #fff;
+      font-weight: 700;
+      margin: 1rem 0 0.4rem;
+    }
+    .rendered-content h1 { font-size: 1.1rem; }
+    .rendered-content h2 { font-size: 1rem; }
+    .rendered-content h3 { font-size: 0.9rem; }
+    .rendered-content p { margin: 0.5rem 0; line-height: 1.7; }
+    .rendered-content ul, .rendered-content ol {
+      margin: 0.4rem 0 0.4rem 1.25rem;
+    }
+    .rendered-content li { margin: 0.2rem 0; }
+    .rendered-content code {
+      background: rgba(255,255,255,0.08);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85em;
+    }
+    .rendered-content pre {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+    .rendered-content pre code {
+      background: none;
+      padding: 0;
+    }
+    .rendered-content blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 1rem;
+      color: var(--muted);
+      margin: 0.5rem 0;
+    }
+    .rendered-content hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1rem 0;
+    }
+
+    /* Severity badges */
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-critical { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+    .badge-high { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-done { background: rgba(34,197,94,0.12); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+
+    /* Summary banner */
+    .summary-banner {
+      display: none;
+      background: linear-gradient(135deg, rgba(79,125,255,0.1), rgba(124,95,255,0.1));
+      border: 1px solid rgba(79,125,255,0.3);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+      margin-top: 1.5rem;
+    }
+    .summary-banner.visible { display: block; }
+    .summary-banner p { color: var(--muted); font-size: 0.875rem; margin-top: 0.25rem; }
+    .summary-banner strong { color: var(--text); font-size: 1rem; }
+
+    /* Error state */
+    .error-msg {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 1rem;
+      color: var(--danger);
+      font-size: 0.875rem;
+      display: none;
+      margin-top: 1rem;
+    }
+    .error-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Schoolwork Log Analyzer</h1>
+    <p>Lade ein iOS-Diagnoseprotokoll hoch &mdash; die KI analysiert es dreimal gründlich auf Absturzursachen.</p>
+  </header>
+
+  <!-- Upload -->
+  <div class="upload-card" id="drop-zone">
+    <input type="file" id="file-input" accept=".log,.txt,.crash,.ips,.json,.gz,.sysdiagnose,.diag,*">
+    <div class="upload-icon">📄</div>
+    <h2>Log-Datei hier ablegen</h2>
+    <p>oder klicken zum Auswählen &nbsp;·&nbsp; .log, .txt, .crash, .ips, .json und andere</p>
+    <div class="file-info" id="file-info">
+      <span>📎</span>
+      <span id="file-name">—</span>
+      <span id="file-size" style="color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <div style="text-align:center">
+    <button class="btn btn-primary" id="analyze-btn" disabled>
+      <span>🔎</span> Analyse starten
+    </button>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="progress-bar" id="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <div class="summary-banner" id="summary-banner">
+    <strong>✅ Analyse abgeschlossen</strong>
+    <p>Alle drei Durchgänge wurden erfolgreich abgeschlossen. Scrolle nach oben für die Ergebnisse.</p>
+  </div>
+</div>
+
+<script>
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const fileInfo = document.getElementById('file-info');
+  const fileName = document.getElementById('file-name');
+  const fileSize = document.getElementById('file-size');
+  const analyzeBtn = document.getElementById('analyze-btn');
+  const progressBar = document.getElementById('progress-bar');
+  const progressFill = document.getElementById('progress-fill');
+  const resultsEl = document.getElementById('results');
+  const summaryBanner = document.getElementById('summary-banner');
+  const errorMsg = document.getElementById('error-msg');
+
+  let selectedFile = null;
+
+  // Drag & Drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    fileName.textContent = file.name;
+    fileSize.textContent = formatBytes(file.size);
+    fileInfo.classList.add('visible');
+    analyzeBtn.disabled = false;
+    errorMsg.classList.remove('visible');
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  // Minimal Markdown renderer
+  function renderMarkdown(text) {
+    const div = document.createElement('div');
+    div.className = 'rendered-content';
+    let html = text
+      // Code blocks
+      .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => `<pre><code>${escHtml(code.trim())}</code></pre>`)
+      // Inline code
+      .replace(/`([^`]+)`/g, (_, c) => `<code>${escHtml(c)}</code>`)
+      // Headers
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      // Bold
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      // HR
+      .replace(/^---+$/gm, '<hr>')
+      // Blockquote
+      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+      // Unordered list items
+      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+      // Ordered list items
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      // Wrap consecutive <li> in <ul>
+      .replace(/(<li>[\s\S]*?<\/li>)(\n<li>[\s\S]*?<\/li>)*/g, m => `<ul>${m}</ul>`)
+      // Paragraphs (double newline)
+      .replace(/\n{2,}/g, '</p><p>')
+    ;
+    div.innerHTML = '<p>' + html + '</p>';
+    return div;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Analysis
+  analyzeBtn.addEventListener('click', startAnalysis);
+
+  async function startAnalysis() {
+    if (!selectedFile) return;
+
+    // Reset UI
+    analyzeBtn.disabled = true;
+    errorMsg.classList.remove('visible');
+    resultsEl.innerHTML = '';
+    summaryBanner.classList.remove('visible');
+    progressBar.classList.add('visible');
+    progressFill.style.width = '5%';
+
+    const formData = new FormData();
+    formData.append('logfile', selectedFile);
+
+    let response;
+    try {
+      response = await fetch('/analyze', { method: 'POST', body: formData });
+    } catch (e) {
+      showError('Netzwerkfehler: ' + e.message);
+      return;
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Unbekannter Fehler' }));
+      showError(err.error || 'Serverfehler');
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let completedPasses = 0;
+    const totalPasses = 3;
+
+    const cardEls = {};     // pass_id -> card element
+    const contentEls = {};  // pass_id -> content accumulator string
+    const bodyEls = {};     // pass_id -> body element
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let event;
+        try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (event.type === 'pass_start') {
+          const card = createPassCard(event.pass_id, event.title, event.icon);
+          cardEls[event.pass_id] = card;
+          contentEls[event.pass_id] = '';
+          bodyEls[event.pass_id] = card.querySelector('.pass-content');
+          resultsEl.appendChild(card);
+          requestAnimationFrame(() => card.classList.add('visible'));
+          updateProgress(completedPasses, totalPasses);
+
+        } else if (event.type === 'text') {
+          contentEls[event.pass_id] += event.content;
+          bodyEls[event.pass_id].textContent = contentEls[event.pass_id];
+
+        } else if (event.type === 'pass_end') {
+          completedPasses++;
+          // Render final markdown
+          const finalText = contentEls[event.pass_id];
+          const bodyEl = bodyEls[event.pass_id];
+          const parent = bodyEl.parentElement;
+          const rendered = renderMarkdown(finalText);
+          parent.replaceChild(rendered, bodyEl);
+
+          // Update status
+          const statusEl = cardEls[event.pass_id].querySelector('.pass-status');
+          statusEl.innerHTML = '<span class="badge badge-done">Fertig</span>';
+          updateProgress(completedPasses, totalPasses);
+
+        } else if (event.type === 'error') {
+          const bodyEl = bodyEls[event.pass_id];
+          if (bodyEl) bodyEl.textContent = '⚠️ Fehler: ' + event.message;
+          completedPasses++;
+
+        } else if (event.type === 'done') {
+          progressFill.style.width = '100%';
+          setTimeout(() => {
+            progressBar.classList.remove('visible');
+            summaryBanner.classList.add('visible');
+            analyzeBtn.disabled = false;
+          }, 600);
+        }
+      }
+    }
+  }
+
+  function createPassCard(passId, title, icon) {
+    const card = document.createElement('div');
+    card.className = 'pass-card';
+    card.id = 'card-' + passId;
+    card.innerHTML = `
+      <div class="pass-header">
+        <span class="pass-icon">${icon}</span>
+        <span class="pass-title">${title}</span>
+        <span class="pass-status"><span class="spinner"></span> Analysiert&hellip;</span>
+      </div>
+      <div class="pass-body">
+        <pre class="pass-content"></pre>
+      </div>`;
+    return card;
+  }
+
+  function updateProgress(completed, total) {
+    const pct = 5 + (completed / total) * 90;
+    progressFill.style.width = pct + '%';
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = '⚠️ ' + msg;
+    errorMsg.classList.add('visible');
+    analyzeBtn.disabled = false;
+    progressBar.classList.remove('visible');
+  }
+</script>
+</body>
+</html>
