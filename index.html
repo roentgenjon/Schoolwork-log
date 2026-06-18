@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schoolwork Log Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --accent: #4f7dff;
+      --accent2: #7c5fff;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --radius: 12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 {
+      font-size: 2rem; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    header p { color: var(--muted); font-size: 0.95rem; }
+
+    /* API Key */
+    .api-key-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .api-key-section label {
+      display: block; font-size: 0.8rem; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 0.6rem;
+    }
+    .api-key-row { display: flex; gap: 0.5rem; }
+    .api-key-row input {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.65rem 0.9rem; color: var(--text);
+      font-size: 0.875rem; font-family: 'SF Mono', monospace;
+      outline: none; transition: border-color 0.15s;
+    }
+    .api-key-row input:focus { border-color: var(--accent); }
+    .api-key-row input::placeholder { color: var(--muted); }
+    .btn-icon {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0 0.75rem; cursor: pointer;
+      color: var(--muted); font-size: 1rem; transition: color 0.15s;
+    }
+    .btn-icon:hover { color: var(--text); }
+    .api-key-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
+    .api-key-hint a { color: var(--accent); text-decoration: none; }
+    .api-key-hint a:hover { text-decoration: underline; }
+
+    /* Upload Zone */
+    .upload-card {
+      background: var(--surface); border: 2px dashed var(--border);
+      border-radius: var(--radius); padding: 3rem 2rem;
+      text-align: center; transition: border-color 0.2s, background 0.2s;
+      cursor: pointer; position: relative;
+    }
+    .upload-card.drag-over { border-color: var(--accent); background: rgba(79,125,255,0.05); }
+    .upload-card input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .upload-card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .upload-card p { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+
+    .file-info {
+      display: none; align-items: center; justify-content: center; gap: 0.5rem;
+      background: rgba(79,125,255,0.1); border: 1px solid rgba(79,125,255,0.3);
+      border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.875rem; color: var(--accent);
+      margin-top: 1rem;
+    }
+    .file-info.visible { display: flex; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1.75rem; border-radius: 8px; font-size: 0.95rem;
+      font-weight: 600; border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    #analyze-btn { margin-top: 1.5rem; }
+
+    /* Progress */
+    .progress-bar {
+      height: 4px; background: var(--border); border-radius: 2px;
+      margin: 1.5rem 0; overflow: hidden; display: none;
+    }
+    .progress-bar.visible { display: block; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px; transition: width 0.4s ease; width: 0%;
+    }
+
+    /* Results */
+    .results { display: flex; flex-direction: column; gap: 1.25rem; margin-top: 2rem; }
+    .pass-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      opacity: 0; transform: translateY(12px); transition: opacity 0.3s, transform 0.3s;
+    }
+    .pass-card.visible { opacity: 1; transform: translateY(0); }
+    .pass-header {
+      display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+    }
+    .pass-icon { font-size: 1.25rem; }
+    .pass-title { font-weight: 600; font-size: 0.95rem; }
+    .pass-status { margin-left: auto; font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
+    .spinner {
+      width: 14px; height: 14px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pass-body { padding: 1.25rem; }
+    .pass-content { font-size: 0.875rem; line-height: 1.7; white-space: pre-wrap; color: var(--text); font-family: inherit; }
+
+    /* Rendered markdown */
+    .rendered-content h1, .rendered-content h2, .rendered-content h3 { color: #fff; font-weight: 700; margin: 1rem 0 0.4rem; }
+    .rendered-content h1 { font-size: 1.1rem; }
+    .rendered-content h2 { font-size: 1rem; }
+    .rendered-content h3 { font-size: 0.9rem; }
+    .rendered-content p { margin: 0.5rem 0; line-height: 1.7; }
+    .rendered-content ul, .rendered-content ol { margin: 0.4rem 0 0.4rem 1.25rem; }
+    .rendered-content li { margin: 0.2rem 0; }
+    .rendered-content code {
+      background: rgba(255,255,255,0.08); padding: 0.1em 0.35em;
+      border-radius: 4px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85em;
+    }
+    .rendered-content pre {
+      background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 0.75rem 0;
+    }
+    .rendered-content pre code { background: none; padding: 0; }
+    .rendered-content blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; color: var(--muted); margin: 0.5rem 0; }
+    .rendered-content hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+
+    .badge {
+      display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px;
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .badge-done { background: rgba(34,197,94,0.12); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+
+    .summary-banner {
+      display: none; background: linear-gradient(135deg, rgba(79,125,255,0.1), rgba(124,95,255,0.1));
+      border: 1px solid rgba(79,125,255,0.3); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; text-align: center; margin-top: 1.5rem;
+    }
+    .summary-banner.visible { display: block; }
+    .summary-banner p { color: var(--muted); font-size: 0.875rem; margin-top: 0.25rem; }
+    .summary-banner strong { color: var(--text); font-size: 1rem; }
+
+    .error-msg {
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px; padding: 1rem; color: var(--danger); font-size: 0.875rem;
+      display: none; margin-top: 1rem;
+    }
+    .error-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Schoolwork Log Analyzer</h1>
+    <p>Lade ein iOS-Diagnoseprotokoll hoch &mdash; die KI analysiert es dreimal gründlich auf Absturzursachen.</p>
+  </header>
+
+  <!-- API Key -->
+  <div class="api-key-section">
+    <label>Anthropic API Key</label>
+    <div class="api-key-row">
+      <input type="password" id="api-key-input" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false">
+      <button class="btn-icon" id="toggle-key" title="Anzeigen/Verbergen">👁</button>
+    </div>
+    <p class="api-key-hint">
+      Dein Key wird nur im Browser verwendet und nie gespeichert oder übertragen.
+      Noch keinen? <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>
+    </p>
+  </div>
+
+  <!-- Upload -->
+  <div class="upload-card" id="drop-zone">
+    <input type="file" id="file-input" accept=".log,.txt,.crash,.ips,.json,.sysdiagnose,.diag,*">
+    <div class="upload-icon">📄</div>
+    <h2>Log-Datei hier ablegen</h2>
+    <p>oder klicken zum Auswählen &nbsp;·&nbsp; .log, .txt, .crash, .ips, .json und andere</p>
+    <div class="file-info" id="file-info">
+      <span>📎</span>
+      <span id="file-name">—</span>
+      <span id="file-size" style="color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <div style="text-align:center">
+    <button class="btn btn-primary" id="analyze-btn" disabled>
+      <span>🔎</span> Analyse starten
+    </button>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="progress-bar" id="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <div class="summary-banner" id="summary-banner">
+    <strong>✅ Analyse abgeschlossen</strong>
+    <p>Alle drei Durchgänge wurden erfolgreich abgeschlossen.</p>
+  </div>
+</div>
+
+<script>
+  const PASSES = [
+    {
+      id: 'pass1',
+      title: '1. Durchgang: Crash-Muster & Fehler',
+      icon: '🔍',
+      system: 'Du bist ein erfahrener iOS-Crash-Analyst. Analysiere Apple-Diagnoseprotokolle auf Abstürze, Exceptions, Speicherfehler und kritische Fehlermuster. Antworte auf Deutsch. Sei präzise und technisch detailliert.',
+      prompt: `Analysiere dieses iOS-Diagnoseprotokoll EXTREM GRÜNDLICH auf:
+1. Exception-Typen (EXC_BAD_ACCESS, SIGABRT, SIGSEGV, etc.)
+2. Stack Traces und fehlerhafte Methoden
+3. Speicherprobleme (Memory Pressure, OOM, Retain Cycles)
+4. Deadlocks und Threading-Probleme
+5. Watchdog-Timeouts (0x8badf00d)
+6. Spezifische Schoolwork-App-Fehler
+
+Liste ALLE gefundenen Probleme mit Zeilennummern/Adressen auf. Priorisiere nach Schweregrad (KRITISCH/HOCH/MITTEL/NIEDRIG).
+
+LOG:
+{log}`,
+    },
+    {
+      id: 'pass2',
+      title: '2. Durchgang: System & Infrastruktur',
+      icon: '🔬',
+      system: 'Du bist ein Apple-MDM- und iOS-Systemexperte für Schulumgebungen. Analysiere Diagnoseprotokolle auf MDM-Konfigurationsprobleme, iOS-Versionsinkompatibilitäten, Netzwerkfehler und Classroom/Schoolwork-spezifische Infrastrukturprobleme. Antworte auf Deutsch mit konkreten technischen Details.',
+      prompt: `Führe einen zweiten, unabhängigen Analysedurchgang durch. Fokussiere auf:
+1. iOS/iPadOS-Versionsprobleme und Inkompatibilitäten
+2. MDM-Konfigurationsfehler (Profil, Policies, Restrictions)
+3. Netzwerk- und iCloud-Verbindungsfehler
+4. Apple School Manager / Classroom-Integration
+5. Berechtigungs- und Entitlement-Probleme
+6. Speicherplatz und Ressourcenengpässe auf dem iPad
+7. Background-Task- und App-Lifecycle-Probleme
+8. Corrupted Caches oder beschädigte Konfigurationsdateien
+
+Identifiziere ALLE Systemfaktoren die den Absturz verursacht haben könnten. Nenne konkrete Werte aus dem Log (Prozesse, Versionen, Adressen).
+
+LOG:
+{log}`,
+    },
+    {
+      id: 'pass3',
+      title: '3. Durchgang: Synthese & Lösungsplan',
+      icon: '📋',
+      system: 'Du bist ein Senior Apple-IT-Berater für Bildungseinrichtungen. Basierend auf einer vollständigen Log-Analyse erstellst du einen klaren, umsetzbaren Lösungsplan für IT-Administratoren. Antworte auf Deutsch. Sei praktisch und lösungsorientiert.',
+      prompt: `Führe den dritten und finalen Analysedurchgang durch. Erstelle:
+
+**WURZELURSACHEN-ANALYSE:**
+Identifiziere die 1-3 wahrscheinlichsten Hauptursachen des Absturzes mit Begründung aus dem Log.
+
+**SOFORTMASSNAHMEN** (kann IT-Admin heute tun):
+- Konkrete Schritte mit Settings/Pfaden
+
+**MITTELFRISTIGE MASSNAHMEN** (diese Woche):
+- Updates, Rekonfigurationen, MDM-Änderungen
+
+**LANGFRISTIGE EMPFEHLUNGEN**:
+- Infrastruktur- und Policy-Verbesserungen
+
+**WEITERE INFORMATIONEN die benötigt werden:**
+- Was sollte der IT-Admin noch liefern um die Diagnose zu verbessern?
+
+**SCHWEREGRAD:** [KRITISCH/HOCH/MITTEL]
+**GESCHÄTZTE LÖSUNGSZEIT:**
+
+LOG:
+{log}`,
+    },
+  ];
+
+  // --- UI references ---
+  const apiKeyInput = document.getElementById('api-key-input');
+  const toggleKey   = document.getElementById('toggle-key');
+  const dropZone    = document.getElementById('drop-zone');
+  const fileInput   = document.getElementById('file-input');
+  const fileInfo    = document.getElementById('file-info');
+  const fileNameEl  = document.getElementById('file-name');
+  const fileSizeEl  = document.getElementById('file-size');
+  const analyzeBtn  = document.getElementById('analyze-btn');
+  const progressBar = document.getElementById('progress-bar');
+  const progressFill= document.getElementById('progress-fill');
+  const resultsEl   = document.getElementById('results');
+  const summaryBanner= document.getElementById('summary-banner');
+  const errorMsg    = document.getElementById('error-msg');
+
+  let selectedFile = null;
+  let logContent   = null;
+
+  // Restore API key from sessionStorage
+  const savedKey = sessionStorage.getItem('anthropic_key');
+  if (savedKey) apiKeyInput.value = savedKey;
+
+  apiKeyInput.addEventListener('input', () => {
+    sessionStorage.setItem('anthropic_key', apiKeyInput.value.trim());
+    updateAnalyzeBtn();
+  });
+
+  toggleKey.addEventListener('click', () => {
+    apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+  });
+
+  // Drag & Drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+  function setFile(file) {
+    selectedFile = file;
+    fileNameEl.textContent = file.name;
+    fileSizeEl.textContent = formatBytes(file.size);
+    fileInfo.classList.add('visible');
+    errorMsg.classList.remove('visible');
+    const reader = new FileReader();
+    reader.onload = e => { logContent = e.target.result; updateAnalyzeBtn(); };
+    reader.readAsText(file);
+  }
+
+  function updateAnalyzeBtn() {
+    analyzeBtn.disabled = !(logContent && apiKeyInput.value.trim().startsWith('sk-ant-'));
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  // --- Analysis ---
+  analyzeBtn.addEventListener('click', startAnalysis);
+
+  async function startAnalysis() {
+    const apiKey = apiKeyInput.value.trim();
+    if (!apiKey || !logContent) return;
+
+    analyzeBtn.disabled = true;
+    errorMsg.classList.remove('visible');
+    resultsEl.innerHTML = '';
+    summaryBanner.classList.remove('visible');
+    progressBar.classList.add('visible');
+    progressFill.style.width = '5%';
+
+    // Truncate if very large
+    const log = logContent.length > 200_000
+      ? logContent.slice(0, 200_000) + '\n\n[... Log gekürzt auf 200.000 Zeichen ...]'
+      : logContent;
+
+    let completedPasses = 0;
+
+    for (const pass of PASSES) {
+      const card = createPassCard(pass.id, pass.title, pass.icon);
+      resultsEl.appendChild(card);
+      requestAnimationFrame(() => card.classList.add('visible'));
+
+      const contentEl = card.querySelector('.pass-content');
+      let accumulated = '';
+
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2048,
+            stream: true,
+            system: pass.system,
+            messages: [{ role: 'user', content: pass.prompt.replace('{log}', log) }],
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err?.error?.message || `HTTP ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') continue;
+            let evt;
+            try { evt = JSON.parse(raw); } catch { continue; }
+            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+              accumulated += evt.delta.text;
+              contentEl.textContent = accumulated;
+              contentEl.scrollIntoView({ block: 'nearest' });
+            }
+          }
+        }
+      } catch (e) {
+        showError('Fehler in ' + pass.title + ': ' + e.message);
+        analyzeBtn.disabled = false;
+        return;
+      }
+
+      // Render markdown
+      const bodyEl = card.querySelector('.pass-body');
+      bodyEl.innerHTML = '';
+      bodyEl.appendChild(renderMarkdown(accumulated));
+
+      // Update status badge
+      card.querySelector('.pass-status').innerHTML = '<span class="badge badge-done">Fertig</span>';
+
+      completedPasses++;
+      progressFill.style.width = (5 + (completedPasses / PASSES.length) * 90) + '%';
+    }
+
+    progressFill.style.width = '100%';
+    setTimeout(() => {
+      progressBar.classList.remove('visible');
+      summaryBanner.classList.add('visible');
+      analyzeBtn.disabled = false;
+    }, 600);
+  }
+
+  function createPassCard(passId, title, icon) {
+    const card = document.createElement('div');
+    card.className = 'pass-card';
+    card.id = 'card-' + passId;
+    card.innerHTML = `
+      <div class="pass-header">
+        <span class="pass-icon">${icon}</span>
+        <span class="pass-title">${title}</span>
+        <span class="pass-status"><span class="spinner"></span> Analysiert&hellip;</span>
+      </div>
+      <div class="pass-body"><pre class="pass-content"></pre></div>`;
+    return card;
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = '⚠️ ' + msg;
+    errorMsg.classList.add('visible');
+    analyzeBtn.disabled = false;
+    progressBar.classList.remove('visible');
+  }
+
+  // Minimal Markdown renderer
+  function renderMarkdown(text) {
+    const div = document.createElement('div');
+    div.className = 'rendered-content';
+    let html = text
+      .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, c) => `<pre><code>${esc(c.trim())}</code></pre>`)
+      .replace(/`([^`]+)`/g, (_, c) => `<code>${esc(c)}</code>`)
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      .replace(/^---+$/gm, '<hr>')
+      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>[\s\S]*?<\/li>)(\n<li>[\s\S]*?<\/li>)*/g, m => `<ul>${m}</ul>`)
+      .replace(/\n{2,}/g, '</p><p>');
+    div.innerHTML = '<p>' + html + '</p>';
+    return div;
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
